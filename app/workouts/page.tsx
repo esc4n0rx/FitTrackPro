@@ -52,12 +52,26 @@ interface ExerciseProgress {
   timerActive: boolean;
 }
 
-/* ===========================
-   Inline Edit Form Schema
-   =========================== */
+const [exercisesOptions, setExercisesOptions] = useState<any[]>([]);
+
+useEffect(() => {
+  async function fetchExercisesOptions() {
+    const { data, error } = await supabase
+      .from("workouts_exercises")
+      .select("*");
+    if (error) {
+      console.error("Erro ao buscar exercícios:", error);
+    } else {
+      setExercisesOptions(data || []);
+    }
+  }
+  fetchExercisesOptions();
+}, []);
+
+
 const exerciseSchema = z.object({
-  exerciseId: z.string().optional(), // for pre-defined exercises from workouts_exercises
-  customName: z.string().optional(), // if manual
+  exerciseId: z.string().optional(), 
+  customName: z.string().optional(),
   category: z.string().optional(),
   sets: z.coerce.number().min(1, { message: "Informe ao menos 1 set." }),
   reps: z.coerce.number().min(1, { message: "Informe ao menos 1 repetição." }),
@@ -78,24 +92,23 @@ const formSchema = z.object({
 });
 
 export default function WorkoutsPage() {
-  // Modal for adding a new workout
+
   const [addOpen, setAddOpen] = useState(false);
-  // Modal for execution/editing of a workout
+
   const [executionOpen, setExecutionOpen] = useState(false);
-  // Edit mode for inline editing in the execution modal
+
   const [editMode, setEditMode] = useState(false);
-  // Active workout for execution/editing
+
   const [activeWorkout, setActiveWorkout] = useState<Workout | null>(null);
-  // List of workouts of the user
+
   const [workouts, setWorkouts] = useState<Workout[]>([]);
-  // User email from localStorage
+
   const [userEmail, setUserEmail] = useState<string | null>(null);
-  // Execution progress for the active workout
+
   const [exerciseProgress, setExerciseProgress] = useState<{ [key: number]: ExerciseProgress }>({});
-  // Flag if the active workout is completed
+
   const [workoutCompleted, setWorkoutCompleted] = useState(false);
 
-  // Refs for timers
   const timerRefs = useRef<{ [key: number]: NodeJS.Timeout | null }>({});
 
   const router = useRouter();
@@ -108,8 +121,6 @@ export default function WorkoutsPage() {
     },
   });
   
-
-  // Load user email
   useEffect(() => {
     if (typeof window !== "undefined") {
       const user = JSON.parse(localStorage.getItem("user") || "null");
@@ -117,7 +128,6 @@ export default function WorkoutsPage() {
     }
   }, []);
 
-  // Fetch workouts
   useEffect(() => {
     if (userEmail) {
       fetchWorkouts();
@@ -432,21 +442,23 @@ async function onEditSubmit(values: EditFormSchema) {
                         Exercício (Selecione)
                       </label>
                       <Select
-                            onValueChange={(val) =>
-                              setValue(`exercises.${index}.exerciseId` as const, val)
-                            }
-                            defaultValue={fieldItem.exerciseId || undefined}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Selecione o exercício" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="1">Leg Press</SelectItem>
-                              <SelectItem value="2">Supino</SelectItem>
-                              <SelectItem value="3">Cardio</SelectItem>
-                              <SelectItem value="manual">Outro (Manual)</SelectItem>
-                            </SelectContent>
-                          </Select>
+                        onValueChange={(val) =>
+                          setValue(`exercises.${index}.exerciseId` as const, val)
+                        }
+                        defaultValue={fieldItem.exerciseId === "" ? "manual" : fieldItem.exerciseId}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione o exercício" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {exercisesOptions.map((option) => (
+                            <SelectItem key={option.id} value={option.id.toString()}>
+                              {option.nome_exercise}
+                            </SelectItem>
+                          ))}
+                          <SelectItem value="manual">Outro (Manual)</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
                     <div className="mb-2">
                       <FormLabel className="block text-sm font-medium">

@@ -24,10 +24,10 @@ import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
 import { useEffect, useState } from "react";
 
-// Schema para um exercício
+// Schema for an exercise
 const exerciseSchema = z.object({
-  exerciseId: z.string().optional(), // ID selecionado da tabela workouts_exercises
-  customName: z.string().optional(), // se for manual
+  exerciseId: z.string().optional(), // Pre-defined exercise ID from workouts_exercises
+  customName: z.string().optional(), // if manual
   category: z.string().optional(),
   sets: z.coerce.number().min(1, { message: "Informe ao menos 1 set." }),
   reps: z.coerce.number().min(1, { message: "Informe ao menos 1 repetição." }),
@@ -35,7 +35,7 @@ const exerciseSchema = z.object({
   rest: z.string(),
 });
 
-// Schema principal do formulário
+// Main form schema
 const formSchema = z.object({
   day: z.enum([
     "Segunda-feira",
@@ -55,7 +55,7 @@ export function WorkoutForm({ onSuccess }: { onSuccess: () => void }) {
     defaultValues: {
       day: "Segunda-feira",
       exercises: [
-        { exerciseId: "", customName: "", sets: 1, reps: 1, weight: 0, rest: "60" },
+        { exerciseId: "manual", customName: "", sets: 1, reps: 1, weight: 0, rest: "60" },
       ],
     },
   });
@@ -80,7 +80,7 @@ export function WorkoutForm({ onSuccess }: { onSuccess: () => void }) {
   }, []);
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
-    // Obtém o e-mail do usuário logado
+    // Get the logged-in user's email
     const user = JSON.parse(localStorage.getItem("user") || "null");
     if (!user || !user.email) {
       toast.error("Usuário não autenticado.");
@@ -88,10 +88,10 @@ export function WorkoutForm({ onSuccess }: { onSuccess: () => void }) {
     }
     const userEmail = user.email;
 
-    // Processa cada exercício: se for selecionado via tabela, usa o nome correspondente;
-    // caso contrário, usa o valor digitado manualmente.
+    // Process each exercise: if selected via table, use the corresponding name;
+    // otherwise, use the manually entered value.
     const processedExercises = values.exercises.map((ex) => ({
-      name: ex.exerciseId
+      name: ex.exerciseId && ex.exerciseId !== "manual"
         ? (exercisesOptions.find((opt) => opt.id === Number(ex.exerciseId))?.nome_exercise || ex.customName)
         : ex.customName,
       category: ex.category,
@@ -102,7 +102,7 @@ export function WorkoutForm({ onSuccess }: { onSuccess: () => void }) {
     }));
 
     try {
-      // Verifica se já existe um treino para o dia
+      // Check if a workout for the day already exists
       const { data: existing, error: fetchError } = await supabase
         .from("workouts")
         .select("*")
@@ -177,7 +177,10 @@ export function WorkoutForm({ onSuccess }: { onSuccess: () => void }) {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Exercício (Selecione)</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <Select
+                    onValueChange={field.onChange}
+                    defaultValue={field.value || "manual"}
+                  >
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Selecione o exercício" />
@@ -189,7 +192,7 @@ export function WorkoutForm({ onSuccess }: { onSuccess: () => void }) {
                           {option.nome_exercise}
                         </SelectItem>
                       ))}
-                      <SelectItem value="">Outro (Manual)</SelectItem>
+                      <SelectItem value="manual">Outro (Manual)</SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage />
@@ -273,7 +276,19 @@ export function WorkoutForm({ onSuccess }: { onSuccess: () => void }) {
           </div>
         ))}
 
-        <Button type="button" onClick={() => append({ exerciseId: "", customName: "", sets: 1, reps: 1, weight: 0, rest: "60" })}>
+        <Button
+          type="button"
+          onClick={() =>
+            append({
+              exerciseId: "manual",
+              customName: "",
+              sets: 1,
+              reps: 1,
+              weight: 0,
+              rest: "60",
+            })
+          }
+        >
           Adicionar Exercício
         </Button>
 
