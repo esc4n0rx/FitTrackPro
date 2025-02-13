@@ -7,14 +7,13 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
 
-// Interfaces para tipagem
 interface WorkoutExercise {
   name: string;
   category: string;
   sets: number;
   reps: number;
   weight?: number;
-  rest: string; // segundos, como string (ex: "60")
+  rest: string;
 }
 
 interface Workout {
@@ -34,18 +33,15 @@ interface ExerciseProgress {
 }
 
 export default function WorkoutExecutionPage() {
-  const { id } = useParams(); // id do treino (workout) na URL
+  const { id } = useParams();
   const router = useRouter();
   const [workout, setWorkout] = useState<Workout | null>(null);
   const [loading, setLoading] = useState(true);
-  // Estado para controlar o progresso de cada exercício (por índice)
   const [exerciseProgress, setExerciseProgress] = useState<{ [key: number]: ExerciseProgress }>({});
   const [workoutCompleted, setWorkoutCompleted] = useState(false);
 
-  // Referências para os timers (por exercício)
   const timerRefs = useRef<{ [key: number]: NodeJS.Timeout | null }>({});
 
-  // Busca o treino pelo ID
   useEffect(() => {
     async function fetchWorkout() {
       setLoading(true);
@@ -59,7 +55,6 @@ export default function WorkoutExecutionPage() {
         console.error(error);
       } else if (data) {
         setWorkout(data as Workout);
-
         const progress: { [key: number]: ExerciseProgress } = {};
         (data as Workout).exercises.forEach((ex: WorkoutExercise, index: number) => {
           progress[index] = { completedSets: 0, timer: 0, timerActive: false };
@@ -99,7 +94,7 @@ export default function WorkoutExecutionPage() {
 
   function handleCompleteSet(exIndex: number, exercise: WorkoutExercise) {
     const progress = exerciseProgress[exIndex];
-    if (progress.timerActive) return; 
+    if (progress.timerActive) return;
 
     if (progress.completedSets < exercise.sets) {
       const newCompleted = progress.completedSets + 1;
@@ -107,7 +102,6 @@ export default function WorkoutExecutionPage() {
         ...prev,
         [exIndex]: { ...prev[exIndex], completedSets: newCompleted },
       }));
-
       if (newCompleted < exercise.sets) {
         const restDuration = parseInt(exercise.rest) || 0;
         if (restDuration > 0) {
@@ -187,9 +181,7 @@ export default function WorkoutExecutionPage() {
                     {progress?.completedSets >= exercise.sets ? "Concluído" : "Marcar Set Concluído"}
                   </Button>
                   {progress?.timerActive && (
-                    <span className="text-sm">
-                      Descanso: {progress.timer}s
-                    </span>
+                    <span className="text-sm">Descanso: {progress.timer}s</span>
                   )}
                 </div>
               </div>
@@ -206,4 +198,8 @@ export default function WorkoutExecutionPage() {
       </Card>
     </div>
   );
+}
+
+export async function generateStaticParams() {
+  return [];
 }
