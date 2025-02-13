@@ -1,7 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
+import { useForm, useFieldArray } from "react-hook-form";
 import * as z from "zod";
 import {
   Form,
@@ -22,8 +22,20 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
+import { useEffect, useState } from "react";
 
-// Agora o formulário inclui o campo para selecionar o dia da semana.
+// Schema para um exercício
+const exerciseSchema = z.object({
+  exerciseId: z.string().optional(), // ID selecionado da tabela workouts_exercises
+  customName: z.string().optional(), // se for manual
+  category: z.string().optional(),
+  sets: z.coerce.number().min(1, { message: "Informe ao menos 1 set." }),
+  reps: z.coerce.number().min(1, { message: "Informe ao menos 1 repetição." }),
+  weight: z.coerce.number().optional(),
+  rest: z.string(),
+});
+
+// Schema principal do formulário
 const formSchema = z.object({
   day: z.enum([
     "Segunda-feira",
@@ -33,17 +45,8 @@ const formSchema = z.object({
     "Sexta-feira",
     "Sábado",
     "Domingo",
-  ], {
-    required_error: "Selecione um dia da semana."
-  }),
-  name: z.string().min(2, {
-    message: "O nome do exercício deve ter pelo menos 2 caracteres.",
-  }),
-  category: z.string(),
-  sets: z.coerce.number().min(1, { message: "Informe ao menos 1 set." }),
-  reps: z.coerce.number().min(1, { message: "Informe ao menos 1 repetição." }),
-  weight: z.coerce.number().optional(),
-  rest: z.string(),
+  ], { required_error: "Selecione um dia da semana." }),
+  exercises: z.array(exerciseSchema).min(1, { message: "Adicione pelo menos um exercício." }),
 });
 
 export function WorkoutForm({ onSuccess }: { onSuccess: () => void }) {
@@ -51,17 +54,33 @@ export function WorkoutForm({ onSuccess }: { onSuccess: () => void }) {
     resolver: zodResolver(formSchema),
     defaultValues: {
       day: "Segunda-feira",
-      name: "",
-      category: "",
-      sets: 1,
-      reps: 1,
-      weight: 0,
-      rest: "60",
+      exercises: [
+        { exerciseId: "", customName: "", sets: 1, reps: 1, weight: 0, rest: "60" },
+      ],
     },
   });
 
+  const { fields, append, remove } = useFieldArray({
+    control: form.control,
+    name: "exercises",
+  });
+
+  const [exercisesOptions, setExercisesOptions] = useState<any[]>([]);
+
+  useEffect(() => {
+    async function fetchExercises() {
+      const { data, error } = await supabase.from("workouts_exercises").select("*");
+      if (error) {
+        console.error("Erro ao buscar exercícios:", error);
+      } else {
+        setExercisesOptions(data || []);
+      }
+    }
+    fetchExercises();
+  }, []);
+
   async function onSubmit(values: z.infer<typeof formSchema>) {
-    // Obtém o e-mail do usuário logado (salvo no localStorage)
+    // Obtém o e-mail do usuário logado
     const user = JSON.parse(localStorage.getItem("user") || "null");
     if (!user || !user.email) {
       toast.error("Usuário não autenticado.");
@@ -69,18 +88,21 @@ export function WorkoutForm({ onSuccess }: { onSuccess: () => void }) {
     }
     const userEmail = user.email;
 
-    // Prepara o objeto do exercício
-    const exercise = {
-      name: values.name,
-      category: values.category,
-      sets: values.sets,
-      reps: values.reps,
-      weight: values.weight,
-      rest: values.rest,
-    };
+    // Processa cada exercício: se for selecionado via tabela, usa o nome correspondente;
+    // caso contrário, usa o valor digitado manualmente.
+    const processedExercises = values.exercises.map((ex) => ({
+      name: ex.exerciseId
+        ? (exercisesOptions.find((opt) => opt.id === Number(ex.exerciseId))?.nome_exercise || ex.customName)
+        : ex.customName,
+      category: ex.category,
+      sets: ex.sets,
+      reps: ex.reps,
+      weight: ex.weight,
+      rest: ex.rest,
+    }));
 
     try {
-      // Verifica se já existe um treino para o dia selecionado
+      // Verifica se já existe um treino para o dia
       const { data: existing, error: fetchError } = await supabase
         .from("workouts")
         .select("*")
@@ -91,30 +113,28 @@ export function WorkoutForm({ onSuccess }: { onSuccess: () => void }) {
       if (fetchError) throw fetchError;
 
       if (existing) {
-        // Acrescenta o novo exercício ao array existente
-        const newExercises = [...existing.exercises, exercise];
+        const newExercises = [...existing.exercises, ...processedExercises];
         const { error: updateError } = await supabase
           .from("workouts")
           .update({ exercises: newExercises })
           .eq("id", existing.id);
         if (updateError) throw updateError;
       } else {
-        // Cria um novo registro de treino para o dia
         const newWorkout = {
           id: crypto.randomUUID(),
           user_email: userEmail,
           day_of_week: values.day,
-          exercises: [exercise],
+          exercises: processedExercises,
         };
         const { error: insertError } = await supabase
           .from("workouts")
           .insert(newWorkout);
         if (insertError) throw insertError;
       }
-      toast.success("Exercício salvo com sucesso!");
+      toast.success("Treino salvo com sucesso!");
       onSuccess();
     } catch (error) {
-      toast.error("Erro ao salvar exercício. Tente novamente.");
+      toast.error("Erro ao salvar treino. Tente novamente.");
       console.error("Erro no WorkoutForm:", error);
     }
   }
@@ -149,103 +169,117 @@ export function WorkoutForm({ onSuccess }: { onSuccess: () => void }) {
           )}
         />
 
-        <FormField
-          control={form.control}
-          name="name"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Nome do Exercício</FormLabel>
-              <FormControl>
-                <Input placeholder="Ex.: Leg Press" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+        {fields.map((fieldItem, index) => (
+          <div key={fieldItem.id} className="border p-4 rounded mb-4">
+            <FormField
+              control={form.control}
+              name={`exercises.${index}.exerciseId` as const}
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Exercício (Selecione)</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione o exercício" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {exercisesOptions.map((option) => (
+                        <SelectItem key={option.id} value={option.id.toString()}>
+                          {option.nome_exercise}
+                        </SelectItem>
+                      ))}
+                      <SelectItem value="">Outro (Manual)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
-        <FormField
-          control={form.control}
-          name="category"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Categoria</FormLabel>
-              <Select onValueChange={field.onChange} defaultValue={field.value}>
-                <FormControl>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione a categoria" />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent>
-                  <SelectItem value="upper">Membros Superiores</SelectItem>
-                  <SelectItem value="lower">Membros Inferiores</SelectItem>
-                  <SelectItem value="cardio">Cardio</SelectItem>
-                  <SelectItem value="core">Core</SelectItem>
-                </SelectContent>
-              </Select>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+            <FormField
+              control={form.control}
+              name={`exercises.${index}.customName` as const}
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Nome do Exercício (se manual)</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Digite o nome do exercício" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
-        <div className="grid grid-cols-2 gap-4">
-          <FormField
-            control={form.control}
-            name="sets"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Sets</FormLabel>
-                <FormControl>
-                  <Input type="number" min="1" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name={`exercises.${index}.sets` as const}
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Sets</FormLabel>
+                    <FormControl>
+                      <Input type="number" min="1" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name={`exercises.${index}.reps` as const}
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Reps</FormLabel>
+                    <FormControl>
+                      <Input type="number" min="1" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
 
-          <FormField
-            control={form.control}
-            name="reps"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Reps</FormLabel>
-                <FormControl>
-                  <Input type="number" min="1" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        </div>
+            <FormField
+              control={form.control}
+              name={`exercises.${index}.weight` as const}
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Peso (Kg)</FormLabel>
+                  <FormControl>
+                    <Input type="number" min="0" step="0.5" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
-        <FormField
-          control={form.control}
-          name="weight"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Peso (Kg)</FormLabel>
-              <FormControl>
-                <Input type="number" min="0" step="0.5" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+            <FormField
+              control={form.control}
+              name={`exercises.${index}.rest` as const}
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Tempo de Descanso (seg)</FormLabel>
+                  <FormControl>
+                    <Input type="number" min="0" step="15" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <Button variant="destructive" onClick={() => remove(index)}>
+              Remover Exercício
+            </Button>
+          </div>
+        ))}
 
-        <FormField
-          control={form.control}
-          name="rest"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Tempo de Descanso (seg)</FormLabel>
-              <FormControl>
-                <Input type="number" min="0" step="15" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+        <Button type="button" onClick={() => append({ exerciseId: "", customName: "", sets: 1, reps: 1, weight: 0, rest: "60" })}>
+          Adicionar Exercício
+        </Button>
 
-        <Button type="submit" className="w-full">Salvar Exercício</Button>
+        <Button type="submit" className="w-full">
+          Salvar Treino
+        </Button>
       </form>
     </Form>
   );
