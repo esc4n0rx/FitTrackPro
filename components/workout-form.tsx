@@ -65,6 +65,12 @@ export function WorkoutForm({ onSuccess }: { onSuccess: () => void }) {
     name: "exercises",
   });
 
+  // Watch the entire exercises array so we can decide when to show the custom name field
+  const exercisesWatch = useWatch({
+    control: form.control,
+    name: "exercises",
+  });
+
   const [exercisesOptions, setExercisesOptions] = useState<any[]>([]);
   useEffect(() => {
     async function fetchExercises() {
@@ -169,138 +175,131 @@ export function WorkoutForm({ onSuccess }: { onSuccess: () => void }) {
           )}
         />
 
-        {/* Wrap each exercise's fields in a collapsible details element */}
-        {fields.map((fieldItem, index) => {
-          // Use useWatch to conditionally render the custom name field
-          const exerciseId = useWatch({
-            control: form.control,
-            name: `exercises.${index}.exerciseId`,
-          });
-          return (
-            <details key={fieldItem.id} className="border p-4 rounded mb-4">
-              <summary className="cursor-pointer font-semibold">
-                Exercício {index + 1}:{" "}
-                {exerciseId !== "manual"
-                  ? exercisesOptions.find(
-                      (opt) => opt.id.toString() === fieldItem.exerciseId
-                    )?.nome_exercise || "Selecione"
-                  : "Outro (Manual)"}
-              </summary>
-              <div className="mt-2 space-y-4">
+        {/* Each exercise is wrapped in a collapsible <details> */}
+        {fields.map((fieldItem, index) => (
+          <details key={fieldItem.id} className="border p-4 rounded mb-4">
+            <summary className="cursor-pointer font-semibold">
+              Exercício {index + 1}:{" "}
+              {exercisesWatch[index]?.exerciseId !== "manual"
+                ? exercisesOptions.find(
+                    (opt) =>
+                      opt.id.toString() === exercisesWatch[index]?.exerciseId
+                  )?.nome_exercise || "Selecione"
+                : "Outro (Manual)"}
+            </summary>
+            <div className="mt-2 space-y-4">
+              <FormField
+                control={form.control}
+                name={`exercises.${index}.exerciseId` as const}
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Exercício (Selecione)</FormLabel>
+                    <Select
+                      onValueChange={field.onChange}
+                      defaultValue={field.value || "manual"}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione o exercício" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {exercisesOptions.map((option) => (
+                          <SelectItem
+                            key={option.id}
+                            value={option.id.toString()}
+                          >
+                            {option.nome_exercise}
+                          </SelectItem>
+                        ))}
+                        <SelectItem value="manual">
+                          Outro (Manual)
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              {/* Only render the custom name field if the selected exercise is "manual" */}
+              {exercisesWatch[index]?.exerciseId === "manual" && (
                 <FormField
                   control={form.control}
-                  name={`exercises.${index}.exerciseId` as const}
+                  name={`exercises.${index}.customName` as const}
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Exercício (Selecione)</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        defaultValue={field.value || "manual"}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione o exercício" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {exercisesOptions.map((option) => (
-                            <SelectItem
-                              key={option.id}
-                              value={option.id.toString()}
-                            >
-                              {option.nome_exercise}
-                            </SelectItem>
-                          ))}
-                          <SelectItem value="manual">
-                            Outro (Manual)
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
+                      <FormLabel>Nome do Exercício (se manual)</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="Digite o nome do exercício"
+                          {...field}
+                        />
+                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-                {exerciseId === "manual" && (
-                  <FormField
-                    control={form.control}
-                    name={`exercises.${index}.customName` as const}
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>
-                          Nome do Exercício (se manual)
-                        </FormLabel>
-                        <FormControl>
-                          <Input
-                            placeholder="Digite o nome do exercício"
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                )}
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name={`exercises.${index}.sets` as const}
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Sets</FormLabel>
-                        <FormControl>
-                          <Input type="number" min="1" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name={`exercises.${index}.reps` as const}
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Reps</FormLabel>
-                        <FormControl>
-                          <Input type="number" min="1" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name={`exercises.${index}.weight` as const}
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Peso (Kg)</FormLabel>
-                        <FormControl>
-                          <Input type="number" min="0" step="0.5" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name={`exercises.${index}.rest` as const}
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Descanso (seg)</FormLabel>
-                        <FormControl>
-                          <Input type="number" min="0" step="15" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-                <Button variant="destructive" onClick={() => remove(index)}>
-                  Remover Exercício
-                </Button>
+              )}
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name={`exercises.${index}.sets` as const}
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Sets</FormLabel>
+                      <FormControl>
+                        <Input type="number" min="1" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name={`exercises.${index}.reps` as const}
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Reps</FormLabel>
+                      <FormControl>
+                        <Input type="number" min="1" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </div>
-            </details>
-          );
-        })}
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name={`exercises.${index}.weight` as const}
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Peso (Kg)</FormLabel>
+                      <FormControl>
+                        <Input type="number" min="0" step="0.5" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name={`exercises.${index}.rest` as const}
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Descanso (seg)</FormLabel>
+                      <FormControl>
+                        <Input type="number" min="0" step="15" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              <Button variant="destructive" onClick={() => remove(index)}>
+                Remover Exercício
+              </Button>
+            </div>
+          </details>
+        ))}
 
         <Button
           type="button"
