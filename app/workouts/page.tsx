@@ -29,9 +29,14 @@ interface Workout {
 export default function WorkoutsPage() {
   const [open, setOpen] = useState(false);
   const [workouts, setWorkouts] = useState<Workout[]>([]);
-  
-  const user = JSON.parse(localStorage.getItem("user") || "null");
-  const userEmail = user?.email;
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const user = JSON.parse(localStorage.getItem("user") || "null");
+      setUserEmail(user?.email || null);
+    }
+  }, []);
 
   useEffect(() => {
     if (userEmail) {
@@ -40,14 +45,16 @@ export default function WorkoutsPage() {
   }, [userEmail]);
 
   async function fetchWorkouts() {
+    if (!userEmail) return;
+
     const { data, error } = await supabase
       .from("workouts")
       .select("*")
       .eq("user_email", userEmail);
+
     if (error) {
       console.error("Erro ao buscar treinos:", error);
     } else {
-  
       setWorkouts(data as Workout[]);
     }
   }
