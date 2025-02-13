@@ -23,8 +23,21 @@ import { toast } from "sonner";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 
 interface WorkoutExercise {
@@ -52,26 +65,12 @@ interface ExerciseProgress {
   timerActive: boolean;
 }
 
-const [exercisesOptions, setExercisesOptions] = useState<any[]>([]);
-
-useEffect(() => {
-  async function fetchExercisesOptions() {
-    const { data, error } = await supabase
-      .from("workouts_exercises")
-      .select("*");
-    if (error) {
-      console.error("Erro ao buscar exercícios:", error);
-    } else {
-      setExercisesOptions(data || []);
-    }
-  }
-  fetchExercisesOptions();
-}, []);
-
-
+/* ===========================
+   Inline Edit Form Schema
+   =========================== */
 const exerciseSchema = z.object({
-  exerciseId: z.string().optional(), 
-  customName: z.string().optional(),
+  exerciseId: z.string().optional(), // from workouts_exercises (pre-defined)
+  customName: z.string().optional(), // if manual
   category: z.string().optional(),
   sets: z.coerce.number().min(1, { message: "Informe ao menos 1 set." }),
   reps: z.coerce.number().min(1, { message: "Informe ao menos 1 repetição." }),
@@ -91,36 +90,46 @@ const formSchema = z.object({
   exercises: z.array(exerciseSchema).min(1, { message: "Adicione pelo menos um exercício." }),
 });
 
+type EditFormSchema = z.infer<typeof formSchema>;
+
 export default function WorkoutsPage() {
-
+  // Modal for adding a new workout
   const [addOpen, setAddOpen] = useState(false);
-
+  // Modal for execution/editing of a workout
   const [executionOpen, setExecutionOpen] = useState(false);
-
+  // Edit mode for inline editing in the execution modal
   const [editMode, setEditMode] = useState(false);
-
+  // Active workout for execution/editing
   const [activeWorkout, setActiveWorkout] = useState<Workout | null>(null);
-
+  // List of workouts of the user
   const [workouts, setWorkouts] = useState<Workout[]>([]);
-
+  // User email from localStorage
   const [userEmail, setUserEmail] = useState<string | null>(null);
-
+  // Execution progress for the active workout
   const [exerciseProgress, setExerciseProgress] = useState<{ [key: number]: ExerciseProgress }>({});
-
+  // Flag if the active workout is completed
   const [workoutCompleted, setWorkoutCompleted] = useState(false);
 
+  // REFS for timers
   const timerRefs = useRef<{ [key: number]: NodeJS.Timeout | null }>({});
 
   const router = useRouter();
 
-  const { setValue } = useForm<EditFormSchema>({
-    resolver: zodResolver(formSchema),
-    defaultValues: {
-      day: "Segunda-feira",
-      exercises: [],
-    },
-  });
-  
+  // Define exercisesOptions state and fetch them from the workouts_exercises table
+  const [exercisesOptions, setExercisesOptions] = useState<any[]>([]);
+  useEffect(() => {
+    async function fetchExercisesOptions() {
+      const { data, error } = await supabase.from("workouts_exercises").select("*");
+      if (error) {
+        console.error("Erro ao buscar exercícios:", error);
+      } else {
+        setExercisesOptions(data || []);
+      }
+    }
+    fetchExercisesOptions();
+  }, []);
+
+  // Get user email from localStorage
   useEffect(() => {
     if (typeof window !== "undefined") {
       const user = JSON.parse(localStorage.getItem("user") || "null");
@@ -128,6 +137,7 @@ export default function WorkoutsPage() {
     }
   }, []);
 
+  // Fetch workouts of the user
   useEffect(() => {
     if (userEmail) {
       fetchWorkouts();
@@ -263,13 +273,13 @@ export default function WorkoutsPage() {
   /* ================================
      Inline Edit Form (using react-hook-form)
      ================================ */
-  type EditFormSchema = z.infer<typeof formSchema>;
   const {
     register,
     handleSubmit,
     control,
     reset,
     formState: { errors },
+    setValue,
   } = useForm<EditFormSchema>({
     resolver: zodResolver(formSchema),
   });
@@ -295,41 +305,38 @@ export default function WorkoutsPage() {
       reset(defaultValues);
     }
   }, [editMode, activeWorkout, reset]);
-  
-async function onEditSubmit(values: EditFormSchema) {
-  if (!activeWorkout || !userEmail) return;
-  // Map form values to WorkoutExercise[]
-  const updatedExercises = values.exercises.map((ex) => ({
-    // You can add additional logic here if needed (for example, lookup by exerciseId)
-    name: ex.customName || "", // using customName as the exercise name
-    category: ex.category || "",
-    sets: ex.sets,
-    reps: ex.reps,
-    weight: ex.weight,
-    rest: ex.rest,
-  }));
-  try {
-    const { error } = await supabase
-      .from("workouts")
-      .update({
-        day_of_week: values.day,
-        exercises: updatedExercises,
-      })
-      .eq("id", activeWorkout.id);
-    if (error) throw error;
-    toast.success("Treino atualizado com sucesso!");
-    setEditMode(false);
-    // Update the active workout locally with the new values
-    setActiveWorkout((prev) =>
-      prev ? { ...prev, day_of_week: values.day, exercises: updatedExercises } : prev
-    );
-    fetchWorkouts();
-  } catch (error) {
-    toast.error("Erro ao atualizar treino.");
-    console.error(error);
-  }
-}
 
+  async function onEditSubmit(values: EditFormSchema) {
+    if (!activeWorkout || !userEmail) return;
+    // Map form values to WorkoutExercise[]
+    const updatedExercises = values.exercises.map((ex) => ({
+      name: ex.customName || "",
+      category: ex.category || "",
+      sets: ex.sets,
+      reps: ex.reps,
+      weight: ex.weight,
+      rest: ex.rest,
+    }));
+    try {
+      const { error } = await supabase
+        .from("workouts")
+        .update({
+          day_of_week: values.day,
+          exercises: updatedExercises,
+        })
+        .eq("id", activeWorkout.id);
+      if (error) throw error;
+      toast.success("Treino atualizado com sucesso!");
+      setEditMode(false);
+      setActiveWorkout((prev) =>
+        prev ? { ...prev, day_of_week: values.day, exercises: updatedExercises } : prev
+      );
+      fetchWorkouts();
+    } catch (error) {
+      toast.error("Erro ao atualizar treino.");
+      console.error(error);
+    }
+  }
 
   return (
     <div className="container p-4 space-y-4">
@@ -409,10 +416,7 @@ async function onEditSubmit(values: EditFormSchema) {
               </p>
             ) : editMode ? (
               // Inline Edit Mode
-              <form
-                onSubmit={handleSubmit(onEditSubmit)}
-                className="space-y-4"
-              >
+              <form onSubmit={handleSubmit(onEditSubmit)} className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium">
                     Dia da Semana
@@ -438,21 +442,26 @@ async function onEditSubmit(values: EditFormSchema) {
                 {fields.map((fieldItem, index) => (
                   <div key={fieldItem.id} className="border p-4 rounded mb-4">
                     <div className="mb-2">
-                      <label className="block text-sm font-medium">
+                      <FormLabel className="block text-sm font-medium">
                         Exercício (Selecione)
-                      </label>
+                      </FormLabel>
                       <Select
                         onValueChange={(val) =>
                           setValue(`exercises.${index}.exerciseId` as const, val)
                         }
-                        defaultValue={fieldItem.exerciseId === "" ? "manual" : fieldItem.exerciseId}
+                        defaultValue={
+                          fieldItem.exerciseId === "" ? "manual" : fieldItem.exerciseId
+                        }
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Selecione o exercício" />
                         </SelectTrigger>
                         <SelectContent>
                           {exercisesOptions.map((option) => (
-                            <SelectItem key={option.id} value={option.id.toString()}>
+                            <SelectItem
+                              key={option.id}
+                              value={option.id.toString()}
+                            >
                               {option.nome_exercise}
                             </SelectItem>
                           ))}
@@ -589,10 +598,7 @@ async function onEditSubmit(values: EditFormSchema) {
                 })}
                 {workoutCompleted && (
                   <div className="mt-4">
-                    <Button
-                      variant="destructive"
-                      onClick={finalizeWorkout}
-                    >
+                    <Button variant="destructive" onClick={finalizeWorkout}>
                       Finalizar Treino
                     </Button>
                   </div>
@@ -602,10 +608,7 @@ async function onEditSubmit(values: EditFormSchema) {
             {/* Buttons to toggle edit mode or delete */}
             <div className="flex space-x-4 mt-4">
               {!editMode && activeWorkout?.status !== "completed" && (
-                <Button
-                  variant="outline"
-                  onClick={() => setEditMode(true)}
-                >
+                <Button variant="outline" onClick={() => setEditMode(true)}>
                   <Edit className="mr-2 h-4 w-4" /> Editar Treino
                 </Button>
               )}
