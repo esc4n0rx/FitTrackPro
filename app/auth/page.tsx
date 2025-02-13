@@ -62,17 +62,28 @@ export default function AuthPage() {
   async function onLogin(values: z.infer<typeof loginSchema>) {
     try {
       setIsLoading(true);
-      const { error } = await supabase.auth.signInWithPassword({
-        email: values.email,
-        password: values.password,
-      });
-
+      
+      // Consulta na tabela para validar o login
+      const { data, error } = await supabase
+        .from("user_profiles")
+        .select("*")
+        .eq("email", values.email)
+        .eq("password", values.password)
+        .maybeSingle();
+      
       if (error) throw error;
-
+      if (!data) {
+        throw new Error("Usuário não encontrado ou senha incorreta.");
+      }
+      
+      // Salva os dados do usuário no localStorage
+      localStorage.setItem("user", JSON.stringify(data));
+      
       router.push("/workouts");
       router.refresh();
     } catch (error) {
       toast.error("Falha ao fazer login. Verifique suas credenciais.");
+      console.error("Erro no onLogin:", error);
     } finally {
       setIsLoading(false);
     }
@@ -87,8 +98,8 @@ export default function AuthPage() {
       const generatedId = crypto.randomUUID();
       console.log("ID gerado para o usuário:", generatedId);
 
-      
-      const { error } = await supabase
+      // Insere os dados e retorna a linha inserida
+      const { data, error } = await supabase
         .from("user_profiles")
         .insert({
           id: generatedId,
@@ -99,13 +110,18 @@ export default function AuthPage() {
           weight: values.weight,
           basal_rate: values.basalRate,
           training_goal: values.trainingGoal,
-        });
+        })
+        .select()
+        .maybeSingle();
 
       if (error) {
         console.error("Erro ao registrar:", error);
         throw error;
       }
-
+      
+      // Salva os dados do usuário no localStorage
+      localStorage.setItem("user", JSON.stringify(data));
+      
       router.push("/workouts");
       router.refresh();
     } catch (error) {
