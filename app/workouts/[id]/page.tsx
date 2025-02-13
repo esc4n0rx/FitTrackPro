@@ -1,5 +1,7 @@
 "use client";
 
+export const dynamic = "force-dynamic";
+
 import React, { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
 
+// Interfaces para tipagem
 interface WorkoutExercise {
   name: string;
   category: string;
@@ -33,13 +36,14 @@ interface ExerciseProgress {
 }
 
 export default function WorkoutExecutionPage() {
-  const { id } = useParams();
+  const { id } = useParams(); // id do treino (workout) da URL
   const router = useRouter();
   const [workout, setWorkout] = useState<Workout | null>(null);
   const [loading, setLoading] = useState(true);
   const [exerciseProgress, setExerciseProgress] = useState<{ [key: number]: ExerciseProgress }>({});
   const [workoutCompleted, setWorkoutCompleted] = useState(false);
 
+  // Referências para os timers de cada exercício
   const timerRefs = useRef<{ [key: number]: NodeJS.Timeout | null }>({});
 
   useEffect(() => {
@@ -189,7 +193,7 @@ export default function WorkoutExecutionPage() {
           })}
           {workoutCompleted && (
             <div className="mt-4">
-              <Button variant="default" onClick={finalizeWorkout}>
+              <Button variant="destructive" onClick={finalizeWorkout}>
                 Finalizar Treino
               </Button>
             </div>
@@ -198,8 +202,4 @@ export default function WorkoutExecutionPage() {
       </Card>
     </div>
   );
-}
-
-export async function generateStaticParams() {
-  return [];
 }
