@@ -26,11 +26,12 @@ const formSchema = z.object({
     message: "Exercise name must be at least 2 characters.",
   }),
   category: z.string(),
-  sets: z.string().transform(Number),
-  reps: z.string().transform(Number),
-  weight: z.string().optional(),
+  sets: z.coerce.number().min(1),  
+  reps: z.coerce.number().min(1), 
+  weight: z.coerce.number().optional(),
   rest: z.string(),
 });
+
 
 export function WorkoutForm({ onSuccess }: { onSuccess: () => void }) {
   const form = useForm<z.infer<typeof formSchema>>({
@@ -38,12 +39,13 @@ export function WorkoutForm({ onSuccess }: { onSuccess: () => void }) {
     defaultValues: {
       name: "",
       category: "",
-      sets: "",
-      reps: "",
-      weight: "",
+      sets: 1,   
+      reps: 1,  
+      weight: 0,
       rest: "60",
     },
   });
+
 
   function onSubmit(values: z.infer<typeof formSchema>) {
     console.log(values);
@@ -58,7 +60,7 @@ export function WorkoutForm({ onSuccess }: { onSuccess: () => void }) {
           name="name"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Exercise Name</FormLabel>
+              <FormLabel>Nome do Exercicio</FormLabel>
               <FormControl>
                 <Input placeholder="e.g., Bench Press" {...field} />
               </FormControl>
@@ -72,7 +74,7 @@ export function WorkoutForm({ onSuccess }: { onSuccess: () => void }) {
           name="category"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Category</FormLabel>
+              <FormLabel>Categoria</FormLabel>
               <Select onValueChange={field.onChange} defaultValue={field.value}>
                 <FormControl>
                   <SelectTrigger>
@@ -80,8 +82,8 @@ export function WorkoutForm({ onSuccess }: { onSuccess: () => void }) {
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
-                  <SelectItem value="upper">Upper Body</SelectItem>
-                  <SelectItem value="lower">Lower Body</SelectItem>
+                  <SelectItem value="upper">Membros Superiores</SelectItem>
+                  <SelectItem value="lower">Membros Inferiores</SelectItem>
                   <SelectItem value="cardio">Cardio</SelectItem>
                   <SelectItem value="core">Core</SelectItem>
                 </SelectContent>
@@ -126,7 +128,7 @@ export function WorkoutForm({ onSuccess }: { onSuccess: () => void }) {
           name="weight"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Weight (kg)</FormLabel>
+              <FormLabel>Peso (Kg)</FormLabel>
               <FormControl>
                 <Input type="number" min="0" step="0.5" {...field} />
               </FormControl>
@@ -140,7 +142,7 @@ export function WorkoutForm({ onSuccess }: { onSuccess: () => void }) {
           name="rest"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Rest Time (seconds)</FormLabel>
+              <FormLabel>Tempo Restante</FormLabel>
               <FormControl>
                 <Input type="number" min="0" step="15" {...field} />
               </FormControl>
@@ -149,7 +151,7 @@ export function WorkoutForm({ onSuccess }: { onSuccess: () => void }) {
           )}
         />
 
-        <Button type="submit" className="w-full">Save Exercise</Button>
+        <Button type="submit" className="w-full">Salvar Exercicio</Button>
       </form>
     </Form>
   );
