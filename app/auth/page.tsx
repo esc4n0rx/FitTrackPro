@@ -83,10 +83,15 @@ export default function AuthPage() {
       setIsLoading(true);
       
       console.log("Valores de registro:", values);
+
+      const generatedId = crypto.randomUUID();
+      console.log("ID gerado para o usuário:", generatedId);
+
       
       const { error } = await supabase
         .from("user_profiles")
         .insert({
+          id: generatedId,
           name: values.name,
           cpf: values.cpf,
           email: values.email,
@@ -248,72 +253,78 @@ export default function AuthPage() {
                           </div>
                           <FormMessage />
                           {showBasalCalculator && (
-                            <Card className="mt-4 p-4">
-                              <CardHeader>
-                                <CardTitle>Calculadora de Taxa Basal</CardTitle>
-                              </CardHeader>
-                              <CardContent>
-                                <div className="space-y-2">
-                                  <div>
-                                    <label className="block text-sm font-medium text-gray-700">Idade</label>
-                                    <Input
-                                      type="number"
-                                      value={calculatorAge}
-                                      onChange={(e) => setCalculatorAge(Number(e.target.value))}
-                                    />
-                                  </div>
-                                  <div>
-                                    <label className="block text-sm font-medium text-gray-700">Altura (cm)</label>
-                                    <Input
-                                      type="number"
-                                      value={calculatorHeight}
-                                      onChange={(e) => setCalculatorHeight(Number(e.target.value))}
-                                    />
-                                  </div>
-                                  <div>
-                                    <label className="block text-sm font-medium text-gray-700">Gênero</label>
-                                    <select
-                                      value={calculatorGender}
-                                      onChange={(e) => setCalculatorGender(e.target.value)}
-                                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
+                            <div className="fixed inset-0 flex items-center justify-center z-50">
+                              <div
+                                className="absolute inset-0 bg-black opacity-50"
+                                onClick={() => setShowBasalCalculator(false)}
+                              ></div>
+                              <Card className="relative z-10 w-full max-w-md p-4">
+                                <CardHeader>
+                                  <CardTitle>Calculadora de Taxa Basal</CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                  <div className="space-y-2">
+                                    <div>
+                                      <label className="block text-sm font-medium text-gray-700">Idade</label>
+                                      <Input
+                                        type="number"
+                                        value={calculatorAge}
+                                        onChange={(e) => setCalculatorAge(Number(e.target.value))}
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="block text-sm font-medium text-gray-700">Altura (cm)</label>
+                                      <Input
+                                        type="number"
+                                        value={calculatorHeight}
+                                        onChange={(e) => setCalculatorHeight(Number(e.target.value))}
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="block text-sm font-medium text-gray-700">Gênero</label>
+                                      <select
+                                        value={calculatorGender}
+                                        onChange={(e) => setCalculatorGender(e.target.value)}
+                                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
+                                      >
+                                        <option value="male">Masculino</option>
+                                        <option value="female">Feminino</option>
+                                      </select>
+                                    </div>
+                                    <Button
+                                      variant="default"
+                                      onClick={() => {
+                                        const currentWeight = registerForm.getValues("weight");
+                                        console.log(
+                                          "Calculando taxa basal com - Peso:",
+                                          currentWeight,
+                                          "Idade:",
+                                          calculatorAge,
+                                          "Altura:",
+                                          calculatorHeight,
+                                          "Gênero:",
+                                          calculatorGender
+                                        );
+                                        if (!currentWeight) {
+                                          toast.error("Por favor, informe o peso para calcular a taxa basal");
+                                          return;
+                                        }
+                                        let basal;
+                                        if (calculatorGender === "male") {
+                                          basal = Math.round((10 * currentWeight) + (6.25 * calculatorHeight) - (5 * calculatorAge) + 5);
+                                        } else {
+                                          basal = Math.round((10 * currentWeight) + (6.25 * calculatorHeight) - (5 * calculatorAge) - 161);
+                                        }
+                                        field.onChange(basal);
+                                        setShowBasalCalculator(false);
+                                      }}
                                     >
-                                      <option value="male">Masculino</option>
-                                      <option value="female">Feminino</option>
-                                    </select>
+                                      Calcular
+                                    </Button>
                                   </div>
-                                  <Button
-                                    variant="default"
-                                    onClick={() => {
-                                      const currentWeight = registerForm.getValues("weight");
-                                      console.log(
-                                        "Calculando taxa basal com - Peso:",
-                                        currentWeight,
-                                        "Idade:",
-                                        calculatorAge,
-                                        "Altura:",
-                                        calculatorHeight,
-                                        "Gênero:",
-                                        calculatorGender
-                                      );
-                                      if (!currentWeight) {
-                                        toast.error("Por favor, informe o peso para calcular a taxa basal");
-                                        return;
-                                      }
-                                      let basal;
-                                      if (calculatorGender === "male") {
-                                        basal = Math.round((10 * currentWeight) + (6.25 * calculatorHeight) - (5 * calculatorAge) + 5);
-                                      } else {
-                                        basal = Math.round((10 * currentWeight) + (6.25 * calculatorHeight) - (5 * calculatorAge) - 161);
-                                      }
-                                      field.onChange(basal);
-                                      setShowBasalCalculator(false);
-                                    }}
-                                  >
-                                    Calcular
-                                  </Button>
-                                </div>
-                              </CardContent>
-                            </Card>
+                                </CardContent>
+                              </Card>
+                            </div>
                           )}
                         </FormItem>
                       )}
