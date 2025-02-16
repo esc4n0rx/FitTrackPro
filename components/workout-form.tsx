@@ -24,10 +24,9 @@ import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
 import { useEffect, useState } from "react";
 
-// Schema for an exercise
 const exerciseSchema = z.object({
-  exerciseId: z.string().optional(), // Pre-defined exercise ID from workouts_exercises
-  customName: z.string().optional(), // if manual
+  exerciseId: z.string().optional(), 
+  customName: z.string().optional(), 
   category: z.string().optional(),
   sets: z.coerce.number().min(1, { message: "Informe ao menos 1 set." }),
   reps: z.coerce.number().min(1, { message: "Informe ao menos 1 repetição." }),
@@ -35,7 +34,6 @@ const exerciseSchema = z.object({
   rest: z.string(),
 });
 
-// Main form schema
 const formSchema = z.object({
   day: z.enum([
     "Segunda-feira",
@@ -65,7 +63,6 @@ export function WorkoutForm({ onSuccess }: { onSuccess: () => void }) {
     name: "exercises",
   });
 
-  // Watch the entire exercises array so we can decide when to show the custom name field
   const exercisesWatch = useWatch({
     control: form.control,
     name: "exercises",
@@ -85,7 +82,6 @@ export function WorkoutForm({ onSuccess }: { onSuccess: () => void }) {
   }, []);
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
-    // Get the logged-in user's email
     const user = JSON.parse(localStorage.getItem("user") || "null");
     if (!user || !user.email) {
       toast.error("Usuário não autenticado.");
@@ -93,8 +89,6 @@ export function WorkoutForm({ onSuccess }: { onSuccess: () => void }) {
     }
     const userEmail = user.email;
 
-    // Process each exercise: if selected via table, use the corresponding name;
-    // otherwise, use the manually entered value.
     const processedExercises = values.exercises.map((ex) => ({
       name:
         ex.exerciseId && ex.exerciseId !== "manual"
@@ -108,7 +102,7 @@ export function WorkoutForm({ onSuccess }: { onSuccess: () => void }) {
     }));
 
     try {
-      // Check if a workout for the day already exists
+
       const { data: existing, error: fetchError } = await supabase
         .from("workouts")
         .select("*")
@@ -175,7 +169,6 @@ export function WorkoutForm({ onSuccess }: { onSuccess: () => void }) {
           )}
         />
 
-        {/* Each exercise is wrapped in a collapsible <details> */}
         {fields.map((fieldItem, index) => (
           <details key={fieldItem.id} className="border p-4 rounded mb-4">
             <summary className="cursor-pointer font-semibold">
@@ -219,7 +212,6 @@ export function WorkoutForm({ onSuccess }: { onSuccess: () => void }) {
                   </FormItem>
                 )}
               />
-              {/* Only render the custom name field if the selected exercise is "manual" */}
               {exercisesWatch[index]?.exerciseId === "manual" && (
                 <FormField
                   control={form.control}
